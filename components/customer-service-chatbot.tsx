@@ -6,10 +6,32 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { CircleDot, Send } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { OpenAIProvider } from '@/lib/llm/providers/openai'
-import { createLLMConfig } from '@/lib/config/llm'
+import { createLLMProvider } from '@/lib/llm/providers/factory'
 import { useChat } from '@/lib/hooks/useChat'
-import { Message as LLMMessage } from '@/lib/llm/types'
+import { functionRegistry } from '@/lib/functions/registry'
+import { ragFunction, queryKnowledgeBase } from '@/lib/functions/rag'
+import { orderLookupFunction, lookupOrder } from '@/lib/functions/order'
+import { scheduleCallFunction, schedulePhoneCall } from '@/lib/functions/phone'
+import { Message } from '@/lib/llm/types'
+
+// Initialize function registry
+functionRegistry.register('queryKnowledgeBase', queryKnowledgeBase, ragFunction);
+functionRegistry.register('lookupOrder', lookupOrder, orderLookupFunction);
+functionRegistry.register('schedulePhoneCall', schedulePhoneCall, scheduleCallFunction);
+
+const INITIAL_MESSAGES: Message[] = [
+  {
+    role: 'system',
+    content: `You are a friendly customer service agent for Rivertown Ball Company. 
+    We specialize in high-end exotic designer wooden craft balls. 
+    You should be helpful, precise, and knowledgeable while maintaining a warm and approachable demeanor. 
+    Remember that we do not make sports balls - we create artistic and decorative wooden spheres.`
+  },
+  {
+    role: 'assistant',
+    content: "Hello! Welcome to Rivertown Ball Company. I'm here to help you with any questions about our designer wooden craft balls. How can I assist you today?"
+  }
+];
 
 interface UIMessage {
   id: number;
@@ -64,22 +86,8 @@ const RollingBallAnimation = () => (
   </div>
 );
 
-// Initialize the OpenAI provider
-const provider = new OpenAIProvider();
-
-// Initial system message
-const INITIAL_MESSAGES: LLMMessage[] = [
-  {
-    role: 'system',
-    content: `You are a helpful customer service representative for Rivertown Ball Company. 
-    Be friendly, professional, and knowledgeable about sports equipment, particularly balls.
-    Always maintain a positive and solution-oriented attitude.`
-  },
-  {
-    role: 'assistant',
-    content: 'Welcome to Rivertown Ball Company! How can I help you today?'
-  }
-];
+// Initialize the provider based on environment variable
+const provider = createLLMProvider();
 
 export function CustomerServiceChatbotComponent() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -92,7 +100,8 @@ export function CustomerServiceChatbotComponent() {
     initialMessages: INITIAL_MESSAGES,
     config: {
       temperature: 0.7,
-      maxTokens: 1000
+      maxTokens: 1000,
+      functions: functionRegistry.getDefinitions()
     }
   });
 
@@ -175,9 +184,9 @@ export function CustomerServiceChatbotComponent() {
           </div>
         </header>
         
-        <main className="flex-grow container mx-auto p-4 md:p-6 flex flex-col max-w-3xl">
-          <ScrollArea className="flex-grow mb-4 bg-black/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl">
-            <div ref={scrollAreaRef} className="space-y-4">
+        <main className="flex-grow container mx-auto p-4 md:p-6 flex flex-col max-w-3xl h-[calc(100vh-8rem)] overflow-hidden">
+          <ScrollArea className="flex-grow mb-4 bg-black/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl h-full">
+            <div ref={scrollAreaRef} className="space-y-4 min-h-full">
               <AnimatePresence>
                 {uiMessages.map((message) => (
                   <motion.div

@@ -1,7 +1,7 @@
 import { LLMProvider, Message, LLMConfig } from '../types';
 import { functionRegistry } from '../../functions/registry';
 
-export class OpenAIProvider implements LLMProvider {
+export class GitHubModelsProvider implements LLMProvider {
   private endpoint: string;
   private apiKey: string;
   private model: string;
@@ -16,7 +16,7 @@ export class OpenAIProvider implements LLMProvider {
     
     this.endpoint = process.env.NEXT_PUBLIC_LLM_BASE_URL + '/chat/completions';
     this.apiKey = process.env.NEXT_PUBLIC_LLM_API_KEY;
-    this.model = process.env.NEXT_PUBLIC_LLM_MODEL || 'gpt-4';
+    this.model = process.env.NEXT_PUBLIC_LLM_MODEL || 'gpt-4o-mini';
   }
 
   private async handleFunctionCall(functionCall: any): Promise<Message> {
@@ -67,7 +67,7 @@ export class OpenAIProvider implements LLMProvider {
           model: this.model,
           messages,
           temperature: config?.temperature ?? 0.7,
-          max_tokens: config?.maxTokens,
+          max_tokens: config?.maxTokens ?? 800,
           functions: config?.functions,
           function_call: 'auto'
         })
@@ -91,7 +91,7 @@ export class OpenAIProvider implements LLMProvider {
 
       return message;
     } catch (error) {
-      console.error('Error calling Azure OpenAI:', error);
+      console.error('Error calling GitHub Models:', error);
       throw error;
     }
   }
@@ -108,7 +108,7 @@ export class OpenAIProvider implements LLMProvider {
           model: this.model,
           messages,
           temperature: config?.temperature ?? 0.7,
-          max_tokens: config?.maxTokens,
+          max_tokens: config?.maxTokens ?? 800,
           functions: config?.functions,
           function_call: 'auto',
           stream: true

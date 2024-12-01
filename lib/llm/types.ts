@@ -1,22 +1,30 @@
 export interface Message {
-  role: 'user' | 'assistant' | 'system';
+  role: 'system' | 'user' | 'assistant' | 'function';
   content: string;
+  name?: string;
+  function_call?: {
+    name: string;
+    arguments: string;
+  };
 }
 
 export interface FunctionDefinition {
   name: string;
   description: string;
-  parameters: Record<string, any>;
+  parameters: {
+    type: string;
+    properties: Record<string, any>;
+    required?: string[];
+  };
 }
 
 export interface LLMConfig {
   temperature?: number;
   maxTokens?: number;
   functions?: FunctionDefinition[];
-  model?: string;
 }
 
 export interface LLMProvider {
   generateResponse(messages: Message[], config?: LLMConfig): Promise<Message>;
-  streamResponse(messages: Message[], config?: LLMConfig): AsyncGenerator<string>;
+  generateStreamingResponse(messages: Message[], config?: LLMConfig): AsyncGenerator<string, void, unknown>;
 } 

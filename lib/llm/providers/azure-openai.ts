@@ -1,22 +1,23 @@
 import { LLMProvider, Message, LLMConfig } from '../types';
 import { functionRegistry } from '../../functions/registry';
 
-export class OpenAIProvider implements LLMProvider {
+export class AzureOpenAIProvider implements LLMProvider {
   private endpoint: string;
   private apiKey: string;
   private model: string;
+  private apiVersion = '2024-02-15-preview';
   
   constructor() {
-    if (!process.env.NEXT_PUBLIC_LLM_BASE_URL) {
-      throw new Error('NEXT_PUBLIC_LLM_BASE_URL environment variable is missing');
+    if (!process.env.NEXT_PUBLIC_AZURE_OPENAI_ENDPOINT) {
+      throw new Error('NEXT_PUBLIC_AZURE_OPENAI_ENDPOINT environment variable is missing');
     }
-    if (!process.env.NEXT_PUBLIC_LLM_API_KEY) {
-      throw new Error('NEXT_PUBLIC_LLM_API_KEY environment variable is missing');
+    if (!process.env.NEXT_PUBLIC_AZURE_OPENAI_KEY) {
+      throw new Error('NEXT_PUBLIC_AZURE_OPENAI_KEY environment variable is missing');
     }
     
-    this.endpoint = process.env.NEXT_PUBLIC_LLM_BASE_URL + '/chat/completions';
-    this.apiKey = process.env.NEXT_PUBLIC_LLM_API_KEY;
-    this.model = process.env.NEXT_PUBLIC_LLM_MODEL || 'gpt-4';
+    this.endpoint = process.env.NEXT_PUBLIC_AZURE_OPENAI_ENDPOINT;
+    this.apiKey = process.env.NEXT_PUBLIC_AZURE_OPENAI_KEY;
+    this.model = process.env.NEXT_PUBLIC_AZURE_OPENAI_MODEL || 'gpt-4o-mini';
   }
 
   private async handleFunctionCall(functionCall: any): Promise<Message> {
@@ -57,17 +58,18 @@ export class OpenAIProvider implements LLMProvider {
 
   async generateResponse(messages: Message[], config?: LLMConfig): Promise<Message> {
     try {
-      const response = await fetch(this.endpoint, {
+      const url = `${this.endpoint}/openai/deployments/${this.model}/chat/completions?api-version=${this.apiVersion}`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'api-key': this.apiKey
         },
         body: JSON.stringify({
-          model: this.model,
           messages,
           temperature: config?.temperature ?? 0.7,
-          max_tokens: config?.maxTokens,
+          top_p: 0.95,
+          max_tokens: config?.maxTokens ?? 800,
           functions: config?.functions,
           function_call: 'auto'
         })
@@ -85,7 +87,10 @@ export class OpenAIProvider implements LLMProvider {
       if (message.function_call) {
         const functionResult = await this.handleFunctionCall(message.function_call);
         // Add the function result to messages and make another API call
-        const newMessages = [...messages, message, functionResult];
+        const newMessages = [...messages, 
+          { role: 'assistant', content: '', function_call: message.function_call } as Message,
+          functionResult
+        ];
         return this.generateResponse(newMessages, config);
       }
 
@@ -98,17 +103,18 @@ export class OpenAIProvider implements LLMProvider {
 
   async *generateStreamingResponse(messages: Message[], config?: LLMConfig): AsyncGenerator<string, void, unknown> {
     try {
-      const response = await fetch(this.endpoint, {
+      const url = `${this.endpoint}/openai/deployments/${this.model}/chat/completions?api-version=${this.apiVersion}`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
+          'api-key': this.apiKey
         },
         body: JSON.stringify({
-          model: this.model,
           messages,
           temperature: config?.temperature ?? 0.7,
-          max_tokens: config?.maxTokens,
+          top_p: 0.95,
+          max_tokens: config?.maxTokens ?? 800,
           functions: config?.functions,
           function_call: 'auto',
           stream: true
@@ -161,7 +167,10 @@ export class OpenAIProvider implements LLMProvider {
                 // Function call is complete
                 const functionCall = JSON.parse(functionCallBuffer);
                 const functionResult = await this.handleFunctionCall(functionCall);
-                const newMessages = [...messages, { role: 'assistant', function_call: functionCall }, functionResult];
+                const newMessages = [...messages, 
+                  { role: 'assistant', content: '', function_call: functionCall } as Message,
+                  functionResult
+                ];
                 const finalResponse = await this.generateResponse(newMessages, config);
                 yield finalResponse.content;
                 return;

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Message, LLMProvider, LLMConfig } from '../llm/types';
+import { functionRegistry } from '../functions/registry';
 
 interface UseChatOptions {
   initialMessages?: Message[];
@@ -19,7 +20,14 @@ export function useChat(provider: LLMProvider, options: UseChatOptions = {}) {
       const userMessage: Message = { role: 'user', content };
       setMessages(prev => [...prev, userMessage]);
       
-      const response = await provider.generateResponse([...messages, userMessage], options.config);
+      const response = await provider.generateResponse(
+        [...messages, userMessage],
+        {
+          ...options.config,
+          functions: functionRegistry.getDefinitions()
+        }
+      );
+
       setMessages(prev => [...prev, response]);
       return response;
     } catch (err) {
@@ -39,14 +47,20 @@ export function useChat(provider: LLMProvider, options: UseChatOptions = {}) {
       const userMessage: Message = { role: 'user', content };
       setMessages(prev => [...prev, userMessage]);
       
-      const stream = provider.streamResponse([...messages, userMessage], options.config);
+      const stream = await provider.generateStreamingResponse(
+        [...messages, userMessage],
+        {
+          ...options.config,
+          functions: functionRegistry.getDefinitions()
+        }
+      );
+
       let fullResponse = '';
-      
       for await (const chunk of stream) {
         fullResponse += chunk;
         yield chunk;
       }
-      
+
       const assistantMessage: Message = { role: 'assistant', content: fullResponse };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (err) {
@@ -63,7 +77,6 @@ export function useChat(provider: LLMProvider, options: UseChatOptions = {}) {
     isLoading,
     error,
     sendMessage,
-    streamMessage,
-    setMessages
+    streamMessage
   };
 } 

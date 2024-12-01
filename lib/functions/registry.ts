@@ -1,8 +1,18 @@
 import { FunctionDefinition } from '../llm/types';
 
-class FunctionRegistry {
+export class FunctionRegistry {
+  private static instance: FunctionRegistry;
   private functions: Map<string, Function> = new Map();
   private definitions: Map<string, FunctionDefinition> = new Map();
+
+  private constructor() {} // Private constructor for singleton
+
+  public static getInstance(): FunctionRegistry {
+    if (!FunctionRegistry.instance) {
+      FunctionRegistry.instance = new FunctionRegistry();
+    }
+    return FunctionRegistry.instance;
+  }
 
   register(name: string, fn: Function, definition: FunctionDefinition) {
     this.functions.set(name, fn);
@@ -18,15 +28,6 @@ class FunctionRegistry {
   getDefinitions(): FunctionDefinition[] {
     return Array.from(this.definitions.values());
   }
-
-  getFunctionDefinition(name: string): FunctionDefinition | undefined {
-    return this.definitions.get(name);
-  }
-
-  clear() {
-    this.functions.clear();
-    this.definitions.clear();
-  }
 }
 
-export const functionRegistry = new FunctionRegistry(); 
+export const functionRegistry = FunctionRegistry.getInstance(); 
